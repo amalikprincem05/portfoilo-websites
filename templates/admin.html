@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Panel | Messages Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0918;
+  --panel: rgba(28,22,66,.72);
+  --line: rgba(255,255,255,.14);
+  --text: #f4f2ff;
+  --muted: #b0abd9;
+  --c1: #8b5cf6;
+  --c2: #22d3ee;
+  --c3: #ff4d9d;
+  --c5: #34d399;
+}
+body {
+  margin: 0;
+  padding: 20px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: var(--c2);
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  backdrop-filter: blur(10px);
+}
+.login-box {
+  max-width: 400px;
+  margin: 80px auto;
+  text-align: center;
+}
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0 20px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  box-sizing: border-box;
+}
+button {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(120deg, var(--c1), var(--c3));
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+button:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-danger {
+  background: linear-gradient(120deg, #ff4d9d, #e11d48);
+}
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+th, td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+th {
+  background: rgba(255,255,255,0.05);
+  color: var(--c2);
+  font-family: 'Syne', sans-serif;
+}
+tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+.no-msg {
+  text-align: center;
+  color: var(--muted);
+  padding: 30px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- LOGIN FORM -->
+  <div id="loginSection" class="card login-box">
+    <h1>Admin Login</h1>
+    <p style="color: var(--muted);">Messages dekhne ke liye password darj karein</p>
+    <input type="password" id="adminPass" placeholder="Password enter karein">
+    <button onclick="login()">Login</button>
+    <p id="loginErr" style="color: var(--c3); margin-top: 12px;"></p>
+  </div>
+
+  <!-- ADMIN DASHBOARD -->
+  <div id="adminDashboard" style="display: none;">
+    <div class="header-actions">
+      <h1>User Messages Dashboard</h1>
+      <div>
+        <button class="btn-danger" onclick="deleteAllMessages()">Sabhi Messages Delete Karein</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="card" style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Subject</th>
+            <th>Message</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="msgTableBody">
+          <!-- Dynamic Content -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+function login() {
+  const pass = document.getElementById('adminPass').value.trim();
+  if (!pass) {
+    document.getElementById('loginErr').textContent = "Kripya password enter karein!";
+    return;
+  }
+  sessionStorage.setItem('admin_token', pass);
+  showDashboard();
+}
+
+function logout() {
+  sessionStorage.removeItem('admin_token');
+  location.reload();
+}
+
+function showDashboard() {
+  document.getElementById('loginSection').style.display = 'none';
+  document.getElementById('adminDashboard').style.display = 'block';
+  loadMessages();
+}
+
+async function loadMessages() {
+  const tbody = document.getElementById('msgTableBody');
+  const token = sessionStorage.getItem('admin_token') || '';
+
+  try {
+    const res = await fetch('/api/messages', {
+      headers: {
+        'X-Admin-Token': token
+      }
+    });
+
+    // 1. Password Galat hone par Alert aur Logout
+    if (res.status === 401) {
+      alert("Galat Password! Kripya 'admin123' enter karein.");
+      logout();
+      return;
+    }
+
+    if (!res.ok) {
+      throw new Error("Server Error: " + res.status);
+    }
+
+    const messages = await res.json();
+
+    // 2. Data Check
+    if (!Array.isArray(messages) || messages.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-msg">Filhaal koi naya message nahi aaya hai.</td></tr>';
+      return;
+    }
+
+    // 3. Render Table
+    tbody.innerHTML = messages.map(msg => `
+      <tr>
+        <td style="white-space: nowrap; color: var(--muted);">${msg.created_at || 'N/A'}</td>
+        <td><b>${escapeHtml(msg.name)}</b></td>
+        <td><a href="mailto:${escapeHtml(msg.email)}" style="color: var(--c2);">${escapeHtml(msg.email)}</a></td>
+        <td>${escapeHtml(msg.subject)}</td>
+        <td>${escapeHtml(msg.message)}</td>
+        <td><button class="btn-danger" onclick="deleteMessage(${msg.id})">Delete</button></td>
+      </tr>
+    `).join('');
+
+  } catch (err) {
+    console.error("Error loading messages:", err);
+    tbody.innerHTML = '<tr><td colspan="6" class="no-msg" style="color:var(--c3);">Messages load karne me error aaya!</td></tr>';
+  }
+}
+
+async function deleteMessage(id) {
+  if (confirm("Kya aap is message ko delete karna chahte hain?")) {
+    const token = sessionStorage.getItem('admin_token') || '';
+    await fetch(`/api/messages/${id}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Token': token }
+    });
+    loadMessages();
+  }
+}
+
+async function deleteAllMessages() {
+  if (confirm("Kya aap sabhi messages ko delete karna chahte hain?")) {
+    const token = sessionStorage.getItem('admin_token') || '';
+    await fetch('/api/messages', {
+      method: 'DELETE',
+      headers: { 'X-Admin-Token': token }
+    });
+    loadMessages();
+  }
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+if (sessionStorage.getItem('admin_token')) {
+  showDashboard();
+}
+</script>
+</body>
+</html>
